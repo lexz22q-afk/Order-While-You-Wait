@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order While You Wait — Airport Restaurant (B1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#3a2410;
+    --blue:#2563eb;
+    --blue-d:#1d4ed8;
+    --amber:#f59e0b;
+    --amber-d:#d97706;
+    --board:#2a1606;
+    --gold:#ffd24a;
+    --correct:#16a34a;     /* зелёный — ТОЛЬКО верные/проверенные ответы */
+    --correct-bg:#dcfce7;
+    --wrong:#dc2626;
+    --wrong-bg:#fee2e2;
+    --card:#fffdf8;
+    --line:#e7d8c0;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:'Nunito',sans-serif;color:var(--ink);background:#efe2cf}
+  #scene{min-height:100vh;background-color:#e7e0d4;transition:background-color 1.6s ease;padding:8px 8px 26px}
+  .wrap{max-width:760px;margin:0 auto}
+
+  /* HUD */
+  .hud{position:sticky;top:0;z-index:40;background:var(--board);color:#fff;border-radius:14px;
+    padding:8px 10px;margin-bottom:10px;box-shadow:0 6px 18px rgba(42,22,6,.3);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .score-board{display:flex;align-items:center;gap:8px;background:#1c0e03;border:1px solid #5a3a18;
+    padding:5px 12px;border-radius:10px;font-family:'Comfortaa',sans-serif;font-weight:700}
+  .score-board .star{font-size:18px}
+  #score{color:var(--gold);font-size:22px;min-width:34px;text-align:right;transition:transform .15s}
+  #score.bump{transform:scale(1.45)}
+  .bar-zone{flex:1;min-width:160px}
+  .bar-label{font-size:12px;color:#f1d9b6;display:flex;justify-content:space-between;margin-bottom:3px;font-weight:700}
+  .bar-track{position:relative;height:16px;background:#1c0e03;border-radius:20px;overflow:hidden;border:1px solid #5a3a18}
+  .bar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--amber-d));border-radius:20px;transition:width .6s ease}
+  .bar-plane{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:15px;left:0;transition:left .6s ease}
+
+  .panel{background:var(--card);border-radius:16px;padding:16px 14px;box-shadow:0 4px 14px rgba(58,36,16,.12)}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--amber);color:#3a2400;font-weight:800;
+    padding:5px 12px;border-radius:8px;font-size:13px;letter-spacing:.3px;box-shadow:0 2px 0 var(--amber-d)}
+  .eyebrow .arrow{font-size:15px}
+  h1,h2,h3{font-family:'Comfortaa',sans-serif;margin:10px 0}
+  h1{font-size:24px}h2{font-size:20px}
+  .q{font-size:19px;font-weight:800;margin:12px 0;line-height:1.35}
+  .ru-hint{color:#8a6a45;font-weight:700;font-size:15px}
+  .prog-mini{font-size:13px;color:#8a6a45;font-weight:700;margin-top:2px}
+
+  .btn{font-family:'Nunito',sans-serif;font-weight:800;font-size:16px;border:none;border-radius:12px;
+    padding:12px 18px;cursor:pointer;background:var(--blue);color:#fff;box-shadow:0 3px 0 var(--blue-d);transition:transform .08s}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--blue-d)}
+  .btn.amber{background:var(--amber);color:#3a2400;box-shadow:0 3px 0 var(--amber-d)}
+  .btn.ghost{background:#f3ecdf;color:var(--ink);box-shadow:0 3px 0 #d9c8ab}
+
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  @media(max-width:520px){.opts{grid-template-columns:1fr}}
+  .opt{background:#faf4e8;border:2px solid var(--line);border-radius:12px;padding:13px 12px;font-size:16px;
+    font-weight:700;cursor:pointer;text-align:left;transition:.12s;line-height:1.3}
+  .opt:hover{border-color:var(--blue);background:#f2eadb}
+  .opt.correct{background:var(--correct-bg);border-color:var(--correct);color:#14532d}
+  .opt.wrong{background:var(--wrong-bg);border-color:var(--wrong);color:#7f1d1d}
+  .opt.lock{pointer-events:none;opacity:.55}
+
+  .field{width:100%;font-family:'Nunito',sans-serif;font-size:18px;font-weight:700;padding:13px 14px;
+    border:2px solid var(--line);border-radius:12px;outline:none;background:#fff}
+  .field:focus{border-color:var(--blue)}
+  .row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .attempts{font-size:13px;color:#8a6a45;font-weight:700;margin-top:8px}
+
+  .mem-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+  @media(max-width:520px){.mem-grid{grid-template-columns:repeat(2,1fr)}}
+  .mem{aspect-ratio:1/.78;border-radius:12px;cursor:pointer;position:relative;perspective:600px}
+  .mem-inner{position:absolute;inset:0;transition:transform .35s;transform-style:preserve-3d}
+  .mem.flip .mem-inner{transform:rotateY(180deg)}
+  .mem-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:12px;
+    backface-visibility:hidden;font-weight:800;padding:5px;text-align:center;font-size:15px;line-height:1.2}
+  .mem-back{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;font-family:'Comfortaa',sans-serif}
+  .mem-front{background:#faf4e8;border:2px solid var(--line);color:var(--ink);transform:rotateY(180deg)}
+  .mem.done .mem-front{background:var(--correct-bg);border-color:var(--correct);color:#14532d}
+  .mem.done{cursor:default}
+
+  .build-target{min-height:54px;background:#f3ecdf;border:2px dashed var(--line);border-radius:12px;padding:8px;
+    display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+  .bank{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .tile{background:#fff;border:2px solid var(--blue);color:var(--blue-d);border-radius:10px;padding:9px 13px;
+    font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 2px 0 #d9c8ab}
+  .tile:active{transform:translateY(2px)}
+  .tile.used{opacity:.32;pointer-events:none}
+  .chip{background:var(--blue);color:#fff;border-radius:10px;padding:9px 13px;font-weight:800;font-size:16px;cursor:pointer}
+
+  .boss-stage{display:flex;flex-direction:column;align-items:center;text-align:center}
+  .boss-hp{width:100%;max-width:360px;margin:6px auto 4px}
+  .hp-track{height:18px;background:#f1d4d4;border-radius:20px;overflow:hidden;border:2px solid #e8a3a3}
+  .hp-fill{height:100%;background:linear-gradient(90deg,#ef4444,#b91c1c);width:100%;transition:width .4s}
+  .boss-name{font-family:'Comfortaa',sans-serif;font-weight:700;color:#7f1d1d;margin:4px 0}
+  .boss-svg{filter:drop-shadow(0 8px 10px rgba(127,29,29,.25));transition:transform .15s}
+  .boss-svg.hit{transform:translateX(-6px) rotate(-4deg)}
+  .boss-svg.heal{transform:scale(1.06)}
+
+  #toast{position:fixed;left:50%;top:14px;transform:translateX(-50%) translateY(-120%);background:var(--correct);
+    color:#fff;font-weight:800;font-size:18px;padding:12px 22px;border-radius:14px;z-index:90;
+    box-shadow:0 8px 24px rgba(22,163,74,.4);transition:transform .3s;font-family:'Comfortaa',sans-serif}
+  #toast.show{transform:translateX(-50%) translateY(0)}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(42,22,6,.55);display:none;align-items:center;justify-content:center;z-index:95;padding:14px}
+  .modal-bg.show{display:flex}
+  .modal{background:#fff;border-radius:18px;max-width:420px;width:100%;padding:20px 18px 18px;position:relative;
+    box-shadow:0 18px 50px rgba(42,22,6,.4);text-align:center}
+  .modal.bad{border-top:7px solid var(--wrong)}
+  .modal .x{position:absolute;right:12px;top:8px;border:none;background:#f3ecdf;border-radius:50%;width:32px;height:32px;
+    font-size:18px;font-weight:800;cursor:pointer;color:var(--ink)}
+  .modal h3{color:var(--wrong);margin:2px 0 8px}
+  .modal .ans{background:var(--correct-bg);border:2px solid var(--correct);color:#14532d;border-radius:12px;padding:10px;
+    font-weight:800;font-size:17px;margin:10px 0}
+  .modal .why{color:#8a6a45;font-weight:700;font-size:14px;line-height:1.4}
+
+  .center{text-align:center}
+  .plane-big{font-size:46px}
+  .stars-out{font-size:40px;letter-spacing:6px}
+  .pill{display:inline-block;background:#f3ecdf;border-radius:20px;padding:5px 12px;font-weight:800;color:#7a5a35;font-size:14px;margin:3px}
+  ul.clean{margin:8px 0;padding-left:20px}ul.clean li{margin:5px 0;font-weight:600}
+</style>
+</head>
+<body>
+<div id="scene">
+  <div class="wrap">
+    <div class="hud">
+      <div class="score-board"><span class="star">⭐</span><span id="score">0</span></div>
+      <div class="bar-zone">
+        <div class="bar-label"><span>🍽️ Сытость · до посадки</span><span id="barPct">0%</span></div>
+        <div class="bar-track">
+          <div class="bar-fill" id="barFill"></div>
+          <div class="bar-plane" id="barPlane">🍴</div>
+        </div>
+      </div>
+    </div>
+    <div id="stage"></div>
+  </div>
+</div>
+
+<div id="toast">ВЕРНО! +10 ⭐️</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal bad" id="modal">
+    <button class="x" id="modalX" aria-label="Закрыть">✕</button>
+    <h3>Не совсем 🙈</h3>
+    <p style="margin:0;font-weight:700">Правильный ответ:</p>
+    <div class="ans" id="modalAns"></div>
+    <p class="why" id="modalWhy"></p>
+    <button class="btn" id="modalNext" style="margin-top:6px">Понятно, дальше →</button>
+  </div>
+</div>
+
+<script>
+/* ===== STATE (только память) ===== */
+const TARGET=40;
+let score=0, correct=0, stageIndex=0, pendingAdvance=null;
+
+const scoreEl=document.getElementById('score');
+const barFill=document.getElementById('barFill');
+const barPct=document.getElementById('barPct');
+const barPlane=document.getElementById('barPlane');
+const sceneEl=document.getElementById('scene');
+const stageEl=document.getElementById('stage');
+
+function lerp(a,b,t){return Math.round(a+(b-a)*t)}
+function updateScene(){
+  const p=Math.min(correct/TARGET,1);
+  const c1=[231,224,212], c2=[255,224,178]; // нейтральный стол -> тёплый «сытый» свет
+  sceneEl.style.backgroundColor=`rgb(${lerp(c1[0],c2[0],p)},${lerp(c1[1],c2[1],p)},${lerp(c1[2],c2[2],p)})`;
+  barFill.style.width=(p*100)+'%';
+  barPct.textContent=Math.round(p*100)+'%';
+  barPlane.style.left=(p*100)+'%';
+}
+function addScore(){
+  score+=10; correct++;
+  scoreEl.textContent=score;
+  scoreEl.classList.add('bump'); setTimeout(()=>scoreEl.classList.remove('bump'),160);
+  updateScene();
+}
+
+/* ===== FEEDBACK ===== */
+const toast=document.getElementById('toast');
+function flashCorrect(cb){toast.classList.add('show');setTimeout(()=>{toast.classList.remove('show');cb&&cb();},1300);}
+const modalBg=document.getElementById('modalBg');
+const modalAns=document.getElementById('modalAns');
+const modalWhy=document.getElementById('modalWhy');
+function showWrong(answer,why,cb){modalAns.textContent=answer;modalWhy.textContent=why||'';pendingAdvance=cb;modalBg.classList.add('show');}
+function closeModal(){modalBg.classList.remove('show');const cb=pendingAdvance;pendingAdvance=null;cb&&cb();}
+document.getElementById('modalX').onclick=closeModal;
+document.getElementById('modalNext').onclick=closeModal;
+
+/* ===== NORMALISE / FLEX ANSWERS ===== */
+function norm(s){return s.toLowerCase().replace(/[.,!?;:]+/g,' ').replace(/['’`]/g,"'").replace(/\s+/g,' ').trim();}
+function variants(s){const n=norm(s);const out=new Set([n]);out.add(n.replace(/^(a|an|the)\s+/,''));out.add('the '+n);out.add('a '+n);return out;}
+function matchAny(input,accepts){const ins=variants(input);for(const a of accepts){for(const av of variants(a)){if(ins.has(av))return true;}}return false;}
+function shuffle(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* ===== STAGES ===== */
+const stages=[];
+
+function renderIntro(){
+  stageEl.innerHTML=`
+  <div class="panel center">
+    <div class="plane-big">🍽️✈️</div>
+    <h1>Order While You Wait</h1>
+    <p style="font-weight:700;color:#7a5a35;max-width:540px;margin:6px auto">
+      До посадки ещё есть время — и ты голоден. Ты в ресторане аэропорта.
+      Сначала прокачаем лексику и вежливые вопросы, а потом сделаем заказ у официанта! 🧑‍🍳</p>
+    <div style="margin:8px 0">
+      <span class="pill">🧠 Лексика</span>
+      <span class="pill">❓ Polite questions</span>
+      <span class="pill">🍽️ Заказ еды</span>
+      <span class="pill">👹 Финальный босс</span>
+    </div>
+    <p class="ru-hint">Зелёный цвет = верный ответ. Приятного аппетита!</p>
+    <button class="btn amber" id="startBtn" style="margin-top:6px">Сесть за столик 🪑</button>
+  </div>`;
+  document.getElementById('startBtn').onclick=next;
+}
+
+/* STAGE 1: MEMORY */
+function renderMemory(done){
+  const pairs=[
+    {en:'menu',ru:'меню'},{en:'waiter',ru:'официант'},{en:'order',ru:'заказ'},{en:'bill',ru:'счёт'},
+    {en:'drink',ru:'напиток'},{en:'dish',ru:'блюдо'},{en:'table',ru:'столик'},{en:'dessert',ru:'десерт'},
+  ];
+  let cards=[];pairs.forEach((p,i)=>{cards.push({id:i,t:p.en,lang:'en'});cards.push({id:i,t:p.ru,lang:'ru'});});
+  cards=shuffle(cards);
+  stageEl.innerHTML=`
+  <div class="panel">
+    <span class="eyebrow"><span class="arrow">➜</span> Этап 1 · За столиком · Память</span>
+    <h2>Найди пары: English ↔ русский</h2>
+    <p class="ru-hint">Открой две карточки. Слово и его перевод = пара. <span id="memCount">0/8</span></p>
+    <div class="mem-grid" id="memGrid"></div>
+  </div>`;
+  const grid=document.getElementById('memGrid'),memCount=document.getElementById('memCount');
+  let open=[],matched=0,lock=false;
+  cards.forEach(c=>{
+    const el=document.createElement('div');el.className='mem';
+    el.innerHTML=`<div class="mem-inner"><div class="mem-face mem-back">🍴</div><div class="mem-face mem-front">${c.t}</div></div>`;
+    el.onclick=()=>{
+      if(lock||el.classList.contains('flip')||el.classList.contains('done'))return;
+      el.classList.add('flip');open.push({el,c});
+      if(open.length===2){
+        lock=true;const[a,b]=open;
+        if(a.c.id===b.c.id&&a.c.lang!==b.c.lang){
+          setTimeout(()=>{a.el.classList.add('done');b.el.classList.add('done');open=[];lock=false;matched++;
+            memCount.textContent=matched+'/8';addScore();flashCorrect();if(matched===8)setTimeout(done,700);},380);
+        }else{setTimeout(()=>{a.el.classList.remove('flip');b.el.classList.remove('flip');open=[];lock=false;},820);}
+      }
+    };
+    grid.appendChild(el);
+  });
+}
+
+/* STAGE 2: CHOOSE BY DESCRIPTION */
+function renderChoose6(done){
+  const POOL=['menu','waiter','bill','water','coffee','sandwich'];
+  const items=[
+    {emoji:'📋',clue:'You read it to choose your food.',ans:'menu'},
+    {emoji:'🧑‍🍳',clue:'The person who brings your food.',ans:'waiter'},
+    {emoji:'🧾',clue:'You ask for it when you want to pay.',ans:'bill'},
+    {emoji:'💧',clue:'A drink with no sugar and no taste.',ans:'water'},
+    {emoji:'☕',clue:'A hot drink. Many people have it in the morning.',ans:'coffee'},
+    {emoji:'🥪',clue:'Bread with cheese or chicken inside.',ans:'sandwich'},
+  ];
+  let i=0;
+  function show(){
+    if(i>=items.length){done();return;}
+    const it=items[i];
+    stageEl.innerHTML=`
+    <div class="panel">
+      <span class="eyebrow"><span class="arrow">➜</span> Этап 2 · Читаем меню · Слово по описанию</span>
+      <div class="prog-mini">Вопрос ${i+1} из ${items.length}</div>
+      <div class="q"><span style="font-size:30px">${it.emoji}</span><br>${it.clue}</div>
+      <div class="opts" id="opts"></div>
+    </div>`;
+    const box=document.getElementById('opts');
+    shuffle(POOL).forEach(w=>{
+      const b=document.createElement('button');b.className='opt';b.textContent=w;
+      b.onclick=()=>{
+        document.querySelectorAll('#opts .opt').forEach(o=>o.classList.add('lock'));
+        if(w===it.ans){b.classList.add('correct');addScore();flashCorrect(()=>{i++;show();});}
+        else{b.classList.add('wrong');[...box.children].forEach(o=>{if(o.textContent===it.ans)o.classList.add('correct')});
+          showWrong(it.ans,'Описание подходит именно этому слову.',()=>{i++;show();});}
+      };
+      box.appendChild(b);
+    });
+  }
+  show();
+}
+
+/* STAGE 3: TYPE THE MISSING PART */
+function renderType(done){
+  const items=[
+    {pre:'',gap:'_____',post:' I have the menu, please?',ru:'Можно мне меню, пожалуйста?',accept:['can','could'],note:'(Can / Could)'},
+    {pre:'',gap:'_____',post:' I have a coffee, please?',ru:'Можно мне кофе, пожалуйста?',accept:['can','could'],note:'(Can / Could)'},
+    {pre:'',gap:'_____',post:' you bring the bill, please?',ru:'Не могли бы вы принести счёт?',accept:['could','can','will','would'],note:'(Could / Can / Will / Would)'},
+    {pre:'How ',gap:'_____',post:' is the soup?',ru:'Сколько стоит суп?',accept:['much']},
+    {pre:'Do you ',gap:'_____',post:' any sandwiches?',ru:'У вас есть сэндвичи?',accept:['have']},
+    {pre:'What would you like to ',gap:'_____',post:'?',ru:'Что вы будете пить? (… to ?)',accept:['drink']},
+  ];
+  let i=0;
+  function show(){
+    if(i>=items.length){done();return;}
+    const it=items[i];let tries=0;
+    stageEl.innerHTML=`
+    <div class="panel">
+      <span class="eyebrow"><span class="arrow">➜</span> Этап 3 · Зовём официанта · Впиши слово</span>
+      <div class="prog-mini">Вопрос ${i+1} из ${items.length}</div>
+      <div class="q">${it.pre}<u>${it.gap}</u>${it.post} ${it.note?'<span class="ru-hint">'+it.note+'</span>':''}</div>
+      <div class="ru-hint">${it.ru}</div>
+      <input class="field" id="inp" placeholder="Напечатай пропущенное слово…" autocomplete="off">
+      <div class="row"><button class="btn" id="check">Проверить</button></div>
+      <div class="attempts" id="att"></div>
+    </div>`;
+    const inp=document.getElementById('inp'),att=document.getElementById('att');inp.focus();
+    function check(){
+      const val=inp.value;if(!val.trim())return;
+      if(matchAny(val,it.accept)){
+        inp.style.borderColor='var(--correct)';inp.style.background='var(--correct-bg)';
+        addScore();flashCorrect(()=>{i++;show();});
+      }else{
+        tries++;
+        if(tries<2){inp.style.borderColor='var(--wrong)';inp.style.background='var(--wrong-bg)';
+          att.textContent='Попробуй ещё раз — осталась 1 попытка.';inp.select();}
+        else{showWrong(it.accept[0],'Это слово делает вопрос верным.',()=>{i++;show();});}
+      }
+    }
+    document.getElementById('check').onclick=check;
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')check();});
+  }
+  show();
+}
+
+/* STAGE 4: BUILD THE QUESTION */
+function renderBuild(done){
+  const items=[
+    {words:['Could','I','have','the','menu'],accept:['could i have the menu'],ru:'Можно мне меню?'},
+    {words:['What','would','you','like','to','drink'],accept:['what would you like to drink'],ru:'Что вы будете пить?'},
+    {words:['How','much','is','the','chicken'],accept:['how much is the chicken'],ru:'Сколько стоит курица?'},
+    {words:['Could','you','bring','the','bill'],accept:['could you bring the bill'],ru:'Не могли бы вы принести счёт?'},
+    {words:['Do','you','have','any','desserts'],accept:['do you have any desserts'],ru:'У вас есть десерты?'},
+    {words:['Can','I','have','a','soup','and','a','juice'],
+      accept:['can i have a soup and a juice','can i have a juice and a soup'],
+      ru:'Можно мне суп и сок? (порядок «суп и сок» / «сок и суп» — оба верны)'},
+  ];
+  let i=0;
+  function show(){
+    if(i>=items.length){done();return;}
+    const it=items[i];let tries=0,chosen=[];
+    stageEl.innerHTML=`
+    <div class="panel">
+      <span class="eyebrow"><span class="arrow">➜</span> Этап 4 · Порядок слов · Собери вопрос</span>
+      <div class="prog-mini">Вопрос ${i+1} из ${items.length}</div>
+      <div class="ru-hint">${it.ru}</div>
+      <div class="build-target" id="tgt"><span style="color:#b79a72">кликай по словам в нужном порядке…</span></div>
+      <div class="bank" id="bank"></div>
+      <div class="row"><button class="btn" id="check">Проверить</button><button class="btn ghost" id="reset">Сбросить</button></div>
+      <div class="attempts" id="att"></div>
+    </div>`;
+    const tgt=document.getElementById('tgt'),bank=document.getElementById('bank'),att=document.getElementById('att');
+    const order=shuffle(it.words.map((w,idx)=>({w,idx})));
+    function redraw(){
+      tgt.innerHTML='';
+      if(chosen.length===0){tgt.innerHTML='<span style="color:#b79a72">кликай по словам в нужном порядке…</span>';}
+      chosen.forEach((c,pos)=>{
+        const chip=document.createElement('span');chip.className='chip';chip.textContent=c.w;
+        chip.onclick=()=>{chosen.splice(pos,1);document.querySelector(`[data-i="${c.idx}"]`).classList.remove('used');redraw();};
+        tgt.appendChild(chip);
+      });
+    }
+    order.forEach(o=>{
+      const t=document.createElement('span');t.className='tile';t.textContent=o.w;t.dataset.i=o.idx;
+      t.onclick=()=>{if(t.classList.contains('used'))return;t.classList.add('used');chosen.push(o);redraw();};
+      bank.appendChild(t);
+    });
+    document.getElementById('reset').onclick=()=>{chosen=[];bank.querySelectorAll('.tile').forEach(t=>t.classList.remove('used'));redraw();};
+    document.getElementById('check').onclick=()=>{
+      const built=chosen.map(c=>c.w).join(' ');
+      if(matchAny(built,it.accept)){
+        tgt.querySelectorAll('.chip').forEach(c=>{c.style.background='var(--correct)';});
+        addScore();flashCorrect(()=>{i++;show();});
+      }else{
+        tries++;
+        if(tries<2){att.textContent='Порядок неверный. Осталась 1 попытка — проверь начало вопроса.';
+          tgt.querySelectorAll('.chip').forEach(c=>{c.style.background='var(--wrong)';});
+          setTimeout(()=>tgt.querySelectorAll('.chip').forEach(c=>{c.style.background='var(--blue)';}),700);}
+        else{const a=it.accept[0];showWrong(a.charAt(0).toUpperCase()+a.slice(1)+'?','Запомни порядок слов в этом вопросе.',()=>{i++;show();});}
+      }
+    };
+  }
+  show();
+}
+
+/* STAGE 5: DIALOGUE */
+function renderDialogue(done){
+  const lines=[
+    {who:'W',text:'Hello! Welcome. Here is your table.'},
+    {who:'C',text:'Thank you. ',gap:true,
+      opts:['Could I have the menu, please?','Could I have menu, please?','Could I the menu have, please?'],correct:0,
+      why:'Вежливая просьба: Could I have + the menu.'},
+    {who:'W',text:'Of course. Here you are.'},
+    {who:'C',text:'',gap:true,
+      opts:['What do you recommend?','What you recommend?','What do you recommends?'],correct:0,
+      why:'Вопрос с do: What do you recommend (без -s).'},
+    {who:'W',text:'The chicken sandwich is very good.'},
+    {who:'C',text:'',gap:true,
+      opts:['Can I have a chicken sandwich, please?','Can have I a chicken sandwich, please?','Can I a chicken sandwich have, please?'],correct:0,
+      why:'Порядок: Can + I + have + a chicken sandwich.'},
+    {who:'W',text:'Sure. And to drink?'},
+    {who:'C',text:'',gap:true,
+      opts:['Could I have a coffee, please?','Could I have coffee a, please?','Could have I a coffee, please?'],correct:0,
+      why:'Артикль перед словом: a coffee. Could I have…'},
+    {who:'W',text:'Here is your meal. Enjoy!'},
+    {who:'C',text:'Thank you. ',gap:true,
+      opts:['How much is the bill?','How much the bill is?','How much bill is?'],correct:0,
+      why:'Прямой вопрос: How much + is + the bill.'},
+    {who:'W',text:'It\'s 12 euros.'},
+    {who:'C',text:'',gap:true,
+      opts:['Can I pay by card?','Can I pay card by?','Can pay I by card?'],correct:0,
+      why:'pay by card; порядок Can + I + pay.'},
+    {who:'W',text:'Yes, of course. Have a good flight!'},
+  ];
+  const gapIdx=lines.map((l,i)=>l.gap?i:-1).filter(i=>i>=0);
+  let g=0;
+  function render(){
+    let html=`<div class="panel">
+      <span class="eyebrow"><span class="arrow">➜</span> Этап 5 · Делаем заказ · Диалог</span>
+      <div class="prog-mini">Реплика ${g+1} из ${gapIdx.length}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">`;
+    lines.forEach((l,i)=>{
+      if(i>gapIdx[g])return;
+      const me=l.who==='C';const ava=me?'🧑‍🦱':'🧑‍🍳';
+      if(l.gap&&gapIdx.indexOf(i)===g){
+        html+=`<div style="background:#fff7e6;border:2px solid var(--amber);border-radius:12px;padding:10px">
+          <b>${ava} Ты:</b> ${l.text}<i style="color:#b07400">…?</i>
+          <div class="opts" id="opts" style="margin-top:8px"></div></div>`;
+      }else{
+        const filled=l.gap?l.opts[l.correct]:l.text;
+        html+=`<div style="background:${me?'#eef4fb':'#faf4e8'};border-radius:12px;padding:9px 11px">
+          <b>${ava} ${me?'Ты':'Официант'}:</b> ${filled}</div>`;
+      }
+    });
+    html+=`</div></div>`;
+    stageEl.innerHTML=html;
+    const box=document.getElementById('opts'),it=lines[gapIdx[g]];
+    const opts=it.opts.map((t,idx)=>({t,ok:idx===it.correct}));
+    shuffle(opts).forEach(o=>{
+      const b=document.createElement('button');b.className='opt';b.textContent=o.t;
+      b.onclick=()=>{
+        document.querySelectorAll('#opts .opt').forEach(x=>x.classList.add('lock'));
+        if(o.ok){b.classList.add('correct');addScore();flashCorrect(()=>{g++;g<gapIdx.length?render():done();});}
+        else{b.classList.add('wrong');[...box.children].forEach(x=>{if(x.textContent===it.opts[it.correct])x.classList.add('correct')});
+          showWrong(it.opts[it.correct],it.why,()=>{g++;g<gapIdx.length?render():done();});}
+      };
+      box.appendChild(b);
+    });
+  }
+  render();
+}
+
+/* STAGE 6: BOSS — The Hangry Monster */
+function bossSVG(){
+  return `<svg class="boss-svg" id="bossSvg" width="150" height="150" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="75" cy="82" rx="56" ry="52" fill="#fb923c"/>
+    <ellipse cx="75" cy="82" rx="56" ry="52" fill="none" stroke="#c2410c" stroke-width="6"/>
+    <!-- belly shine -->
+    <ellipse cx="56" cy="60" rx="14" ry="9" fill="#fdba74" opacity="0.7"/>
+    <!-- angry brows -->
+    <line x1="48" y1="58" x2="66" y2="66" stroke="#7c2d12" stroke-width="6" stroke-linecap="round"/>
+    <line x1="102" y1="58" x2="84" y2="66" stroke="#7c2d12" stroke-width="6" stroke-linecap="round"/>
+    <!-- eyes -->
+    <circle cx="60" cy="74" r="7" fill="#fff"/><circle cx="62" cy="75" r="3.5" fill="#7c2d12"/>
+    <circle cx="90" cy="74" r="7" fill="#fff"/><circle cx="88" cy="75" r="3.5" fill="#7c2d12"/>
+    <!-- big hungry mouth -->
+    <path d="M52 96 Q75 122 98 96 Q75 108 52 96 Z" fill="#7c2d12"/>
+    <path d="M58 99 L62 92 L66 99 L70 92 L74 99 L78 92 L82 99 L86 92 L90 99" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+    <!-- fork & knife arms -->
+    <g stroke="#7c2d12" stroke-width="5" stroke-linecap="round">
+      <line x1="22" y1="86" x2="10" y2="70"/><line x1="10" y1="70" x2="6" y2="60"/>
+      <line x1="10" y1="70" x2="13" y2="60"/><line x1="10" y1="70" x2="16" y2="62"/>
+      <line x1="128" y1="86" x2="140" y2="66"/>
+    </g>
+    <line x1="60" y1="132" x2="56" y2="146" stroke="#c2410c" stroke-width="6" stroke-linecap="round"/>
+    <line x1="90" y1="132" x2="94" y2="146" stroke="#c2410c" stroke-width="6" stroke-linecap="round"/>
+  </svg>`;
+}
+function renderBoss(done){
+  const pool=[
+    {q:'Выбери вежливый заказ:',opts:['Could I have the menu, please?','Could I have menu, please?','Could I menu have, please?','Have I could the menu?'],c:0},
+    {q:'_____ would you like to drink?',opts:['What','How','Where','Who'],c:0},
+    {q:'How much _____ the soup?',opts:['is','are','do','be'],c:0},
+    {q:'Where do you read the dishes?',opts:['menu','bill','table','waiter'],c:0},
+    {q:'Can I pay _____ card?',opts:['by','at','for','to'],c:0},
+    {q:'Who brings your food in a restaurant?',opts:['waiter','menu','bill','dessert'],c:0},
+    {q:'Выбери верный вопрос:',opts:['Do you have any desserts?','Have you any desserts do?','Do you any desserts have?','You do have any desserts?'],c:0},
+    {q:'Спроси совет официанта — верно:',opts:['What do you recommend?','What you recommend?','What do you recommends?','What recommend you?'],c:0},
+    {q:'You ask for it when you want to pay.',opts:['bill','menu','order','table'],c:0},
+    {q:'_____ I have a coffee, please?',opts:['Could','Do','Am','Where'],c:0},
+    {q:'A sweet dish at the end of a meal.',opts:['dessert','starter','drink','table'],c:0},
+    {q:'Could you _____ the bill, please?',opts:['bring','brings','bringing','brought'],c:0},
+  ];
+  let HP=8;const MAXHP=8;let queue=shuffle(pool),qi=0;
+  stageEl.innerHTML=`
+  <div class="panel boss-stage">
+    <span class="eyebrow"><span class="arrow">➜</span> Финальный босс · Успей поесть до посадки!</span>
+    <div class="boss-name">👹 Грозный Голод <span class="ru-hint">— урчит и торопит</span></div>
+    ${bossSVG()}
+    <div class="boss-hp"><div class="hp-track"><div class="hp-fill" id="hpFill"></div></div>
+      <div class="ru-hint" id="hpTxt">HP: ${HP}/${MAXHP}</div></div>
+    <p class="ru-hint">Верный ответ — удар (−1 HP). Ошибка — он лечится (+1 HP). Накорми его правильными вопросами!</p>
+    <div style="width:100%"><div class="q" id="bq"></div><div class="opts" id="bopts"></div></div>
+  </div>`;
+  const hpFill=document.getElementById('hpFill'),hpTxt=document.getElementById('hpTxt');
+  const bq=document.getElementById('bq'),bopts=document.getElementById('bopts'),svg=document.getElementById('bossSvg');
+  function drawHP(){hpFill.style.width=(HP/MAXHP*100)+'%';hpTxt.textContent='HP: '+HP+'/'+MAXHP;}
+  function ask(){
+    if(HP<=0){bq.innerHTML='✅ <b style="color:var(--correct)">Ты поел и успел на рейс!</b>';bopts.innerHTML='';setTimeout(done,900);return;}
+    if(qi>=queue.length){queue=shuffle(pool);qi=0;}
+    const it=queue[qi];bq.textContent=it.q;bopts.innerHTML='';
+    const opts=it.opts.map((t,idx)=>({t,ok:idx===it.c}));
+    shuffle(opts).forEach(o=>{
+      const b=document.createElement('button');b.className='opt';b.textContent=o.t;
+      b.onclick=()=>{
+        document.querySelectorAll('#bopts .opt').forEach(x=>x.classList.add('lock'));
+        if(o.ok){b.classList.add('correct');HP--;drawHP();addScore();
+          svg.classList.add('hit');setTimeout(()=>svg.classList.remove('hit'),200);flashCorrect(()=>{qi++;ask();});}
+        else{b.classList.add('wrong');[...bopts.children].forEach(x=>{if(x.textContent===it.opts[it.c])x.classList.add('correct')});
+          if(HP<MAXHP)HP++;drawHP();svg.classList.add('heal');setTimeout(()=>svg.classList.remove('heal'),200);
+          showWrong(it.opts[it.c],'Босс восстановил 1 HP. Будь точнее!',()=>{qi++;ask();});}
+      };
+      bopts.appendChild(b);
+    });
+  }
+  drawHP();ask();
+}
+
+/* RESULTS */
+function renderResults(){
+  const MAX=400;
+  let stars=score>=350?3:score>=250?2:1;
+  const starStr='★'.repeat(stars)+'☆'.repeat(3-stars);
+  const msg=stars===3?'Идеальный обед! 🍽️🌟':stars===2?'Сытно и вежливо — почти идеально!':'Ты поел, но в следующий раз закажем точнее!';
+  stageEl.innerHTML=`
+  <div class="panel center">
+    <div class="plane-big">🍽️🛫</div>
+    <h1>Meal complete!</h1>
+    <div class="stars-out" style="color:var(--amber)">${starStr}</div>
+    <p style="font-weight:800;font-size:20px">Очки: <span style="color:var(--amber-d)">${score}</span> / ${MAX}</p>
+    <p class="ru-hint">${msg}</p>
+    <p style="font-weight:700;color:#7a5a35;margin-top:10px">Ты потренировал:</p>
+    <ul class="clean" style="display:inline-block;text-align:left">
+      <li>лексику ресторана (menu, waiter, bill, dessert…)</li>
+      <li>вежливые просьбы: <i>Could I have the menu, please?</i></li>
+      <li>вопросы с do: <i>What do you recommend?</i></li>
+      <li>цена и оплата: <i>How much is the bill? · Can I pay by card?</i></li>
+    </ul>
+    <div style="margin-top:12px"><button class="btn amber" id="again">Сыграть снова 🔁</button></div>
+  </div>`;
+  document.getElementById('again').onclick=()=>{score=0;correct=0;stageIndex=0;scoreEl.textContent='0';updateScene();renderIntro();};
+}
+
+/* FLOW */
+stages.push(renderMemory,renderChoose6,renderType,renderBuild,renderDialogue,renderBoss);
+function next(){if(stageIndex>=stages.length){renderResults();return;}const fn=stages[stageIndex++];fn(()=>{next();});}
+updateScene();renderIntro();
+</script>
+</body>
+</html>
